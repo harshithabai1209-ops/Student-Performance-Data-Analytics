@@ -1,0 +1,317 @@
+main.py
+code:
+from tkinter import *
+from tkinter import messagebox
+from database import create_db
+import sqlite3
+import matplotlib.pyplot as plt
+
+create_db()
+
+# ---------------- REGISTER STAFF ----------------
+def register_staff():
+    win = Toplevel(root)
+    win.title("Register Staff")
+    win.geometry("400x400")
+
+    Label(win, text="Name").pack()
+    name = Entry(win)
+    name.pack()
+
+    Label(win, text="Mobile").pack()
+    mobile = Entry(win)
+    mobile.pack()
+
+    Label(win, text="Email").pack()
+    email = Entry(win)
+    email.pack()
+
+    Label(win, text="Password").pack()
+    pwd = Entry(win, show="*")
+    pwd.pack()
+
+    def save():
+        if not name.get() or not mobile.get() or not email.get() or not pwd.get():
+            messagebox.showerror("Error", "All Fields Required")
+            return
+
+        if len(mobile.get()) != 10 or not mobile.get().isdigit():
+            messagebox.showerror("Error", "Invalid Mobile Number")
+            return
+
+        conn = sqlite3.connect("student.db")
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("INSERT INTO register VALUES (?,?,?,?)",
+                           (name.get(), mobile.get(), email.get(), pwd.get()))
+            conn.commit()
+            messagebox.showinfo("Success", "Registered Successfully")
+            win.destroy()
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error", "Email Already Exists")
+
+        conn.close()
+
+    Button(win, text="Register", command=save).pack(pady=20)
+
+# ---------------- ADD STUDENT ----------------
+def add_student():
+    win = Toplevel(root)
+    win.title("Add Student")
+    win.geometry("400x400")
+
+    Label(win, text="Roll No").pack()
+    rno = Entry(win)
+    rno.pack()
+
+    Label(win, text="Name").pack()
+    name = Entry(win)
+    name.pack()
+
+    Label(win, text="T1 Marks").pack()
+    t1 = Entry(win)
+    t1.pack()
+
+    Label(win, text="T2 Marks").pack()
+    t2 = Entry(win)
+    t2.pack()
+
+    Label(win, text="T3 Marks").pack()
+    t3 = Entry(win)
+    t3.pack()
+
+    def save():
+        if not rno.get() or not name.get() or not t1.get() or not t2.get() or not t3.get():
+            messagebox.showerror("Error", "All Fields Required")
+            return
+
+        if not t1.get().isdigit() or not t2.get().isdigit() or not t3.get().isdigit():
+            messagebox.showerror("Error", "Marks must be numbers")
+            return
+
+        try:
+            avg = (int(t1.get()) + int(t2.get()) + int(t3.get())) / 3
+
+            conn = sqlite3.connect("student.db")
+            cursor = conn.cursor()
+
+            cursor.execute("INSERT INTO student VALUES (?,?,?,?,?,?)",
+                           (rno.get(), name.get(),
+                            int(t1.get()), int(t2.get()), int(t3.get()), avg))
+            conn.commit()
+            conn.close()
+
+            messagebox.showinfo("Success", "Student Added Successfully")
+            win.destroy()
+
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error", "Roll Number Already Exists")
+
+    Button(win, text="Save", command=save).pack(pady=20)
+
+# ---------------- VIEW STUDENTS ----------------
+def view_students():
+    win = Toplevel(root)
+    win.title("View Students")
+    win.geometry("650x400")
+
+    conn = sqlite3.connect("student.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM student")
+    data = cursor.fetchall()
+    conn.close()
+
+    Label(win, text="Roll No   Name   T1   T2   T3   Avg",
+          font=("Arial", 12, "bold")).pack(pady=10)
+
+    for row in data:
+        text = f"{row[0]}    {row[1]}    {row[2]}    {row[3]}    {row[4]}    {round(row[5],2)}"
+        Label(win, text=text).pack()
+
+# ---------------- VIEW STAFF ----------------
+def view_staff():
+    win = Toplevel(root)
+    win.title("View Staff")
+    win.geometry("600x400")
+
+    conn = sqlite3.connect("student.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, mobile, email FROM register")
+    data = cursor.fetchall()
+    conn.close()
+
+    Label(win, text="Name   Mobile   Email",
+          font=("Arial", 12, "bold")).pack(pady=10)
+
+    for row in data:
+        text = f"{row[0]}    {row[1]}    {row[2]}"
+        Label(win, text=text).pack()
+
+# ---------------- ANALYSE PERFORMANCE ----------------
+def analyse():
+    conn = sqlite3.connect("student.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT rno, t1, t2, t3 FROM student")
+    data = cursor.fetchall()
+    conn.close()
+
+    if not data:
+        messagebox.showerror("Error", "No Student Data Available")
+        return
+
+    rnos = []
+    t1_marks = []
+    t2_marks = []
+    t3_marks = []
+
+    for row in data:
+        rnos.append(row[0])
+        t1_marks.append(row[1])
+        t2_marks.append(row[2])
+        t3_marks.append(row[3])
+
+    # BAR GRAPH
+    plt.figure()
+    plt.bar(rnos, t1_marks)
+    plt.title("T1 Performance")
+    plt.show()
+
+    # LINE GRAPH
+    plt.figure()
+    plt.plot(rnos, t1_marks, marker='o', label="T1")
+    plt.plot(rnos, t2_marks, marker='o', label="T2")
+    plt.plot(rnos, t3_marks, marker='o', label="T3")
+    plt.legend()
+    plt.title("Test Wise Performance")
+    plt.show()
+
+# ---------------- STAFF LOGIN ----------------
+def staff_login():
+    win = Toplevel(root)
+    win.title("Staff Login")
+    win.geometry("300x250")
+
+    Label(win, text="Email").pack()
+    email = Entry(win)
+    email.pack()
+
+    Label(win, text="Password").pack()
+    pwd = Entry(win, show="*")
+    pwd.pack()
+
+    def check():
+        conn = sqlite3.connect("student.db")
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM register WHERE email=? AND pwd=?",
+                       (email.get(), pwd.get()))
+        data = cursor.fetchone()
+
+        if data:
+            messagebox.showinfo("Success", "Login Successful")
+            win.destroy()
+            staff_dashboard()
+        else:
+            messagebox.showerror("Error", "Invalid Login")
+
+        conn.close()
+
+    Button(win, text="Login", command=check).pack(pady=15)
+
+# ---------------- ADMIN LOGIN ----------------
+def admin_login():
+    win = Toplevel(root)
+    win.title("Admin Login")
+    win.geometry("300x250")
+
+    Label(win, text="Admin Email").pack()
+    email = Entry(win)
+    email.pack()
+
+    Label(win, text="Admin Password").pack()
+    pwd = Entry(win, show="*")
+    pwd.pack()
+
+    def check():
+        if email.get() == "admin@gmail.com" and pwd.get() == "admin123":
+            messagebox.showinfo("Success", "Admin Login Successful")
+            win.destroy()
+            admin_dashboard()
+        else:
+            messagebox.showerror("Error", "Invalid Admin Login")
+
+    Button(win, text="Login", command=check).pack(pady=15)
+
+# ---------------- DASHBOARDS ----------------
+def staff_dashboard():
+    dash = Toplevel(root)
+    dash.title("Staff Dashboard")
+    dash.geometry("400x300")
+
+    Label(dash, text="Staff Dashboard", font=("Arial", 16)).pack(pady=20)
+
+    Button(dash, text="Add Student", width=20, command=add_student).pack(pady=10)
+    Button(dash, text="View Students", width=20, command=view_students).pack(pady=10)
+    Button(dash, text="Logout", width=20, command=dash.destroy).pack(pady=10)
+
+def admin_dashboard():
+    dash = Toplevel(root)
+    dash.title("Admin Dashboard")
+    dash.geometry("400x350")
+
+    Label(dash, text="Admin Dashboard", font=("Arial", 16)).pack(pady=20)
+
+    Button(dash, text="View Staff", width=20, command=view_staff).pack(pady=10)
+    Button(dash, text="View Students", width=20, command=view_students).pack(pady=10)
+    Button(dash, text="Analyse Performance", width=20, command=analyse).pack(pady=10)
+    Button(dash, text="Logout", width=20, command=dash.destroy).pack(pady=10)
+
+# ---------------- MAIN WINDOW ----------------
+root = Tk()
+root.title("Student Performance Data Analytics")
+root.geometry("800x500")
+root.configure(bg="white")
+
+Label(root,
+      text="Student Performance Data Analytics",
+      font=("Arial", 22, "bold"),
+      bg="lightblue").pack(fill=X)
+
+Button(root, text="Register Staff", width=20, command=register_staff).pack(pady=20)
+Button(root, text="Staff Login", width=20, command=staff_login).pack(pady=10)
+Button(root, text="Admin Login", width=20, command=admin_login).pack(pady=10)
+
+root.mainloop()
+
+database.py
+code:
+
+import sqlite3
+
+def create_db():
+    conn = sqlite3.connect("student.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS register(
+        name TEXT,
+        mobile TEXT,
+        email TEXT PRIMARY KEY,
+        pwd TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS student(
+        rno TEXT PRIMARY KEY,
+        name TEXT,
+        t1 INTEGER,
+        t2 INTEGER,
+        t3 INTEGER,
+        avg REAL
+    )
+    """)
+
+    conn.commit()
+    conn.close()
